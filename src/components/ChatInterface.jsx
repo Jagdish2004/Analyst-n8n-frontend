@@ -1,97 +1,106 @@
+// ChatInterface.jsx
 import { useEffect, useState, useRef } from "react";
 import initClient from "../socketClient";
 
 export function ChatInterface({ sessionId }) {
-  const [message, setMessage] = useState("");       
-  const [messages, setMessages] = useState([]); 
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([]);
 
-  // ✅ Keep socket stable across renders
   const socketRef = useRef(null);
 
+  // --- Setup socket connection once ---
   useEffect(() => {
-    // create socket only once
     socketRef.current = initClient();
 
-    // cleanup on unmount
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+    const handler = (msg) => {
+      const normalized =
+        typeof msg === "string" ? { text: msg, role: "assistant" } : msg;
+      setMessages((prev) => [...prev, normalized]);
     };
-  }, []); // empty deps → runs once
 
+    socketRef.current.on("message", handler);
+
+    return () => {
+      socketRef.current.off("message", handler);
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    };
+  }, []);
+
+  // --- Fetch history when session changes ---
   useEffect(() => {
     if (!sessionId) {
-      setMessages([])
-      return
+      setMessages([]);
+      return;
     }
+
     async function fetchHistory() {
       try {
-        const response = await fetch(`http://localhost:3000/${sessionId}/history`, {
-          method: "GET",
-          credentials: "include"
-        });
+        const response = await fetch(
+          `http://localhost:3000/${sessionId}/history`,
+          { method: "GET", credentials: "include" }
+        );
         const data = await response.json();
-        // normalize to {text, sessionId, role}
+
+        // Normalize DB rows
         const normalized = data.map((row) => ({
-          text: row.message?.text || row.message || row.text || String(row.message),
+          text:String(row.message),
+          role: row.type || "user",
           sessionId: row.session_id || sessionId,
-          role: row.role || "user"
-        }))
+        }));
+
         setMessages(normalized);
-      } catch (error) {
-        console.error("❌ Error fetching history:", error);
+      } catch (err) {
+        console.error("❌ Error fetching history:", err);
       }
     }
 
+    setMessages([]); // clear old session messages
     fetchHistory();
   }, [sessionId]);
 
-  useEffect(() => {
-    if (!socketRef.current) return;
-
-    // Listen for incoming messages
-    socketRef.current.on("message", (msg) => {
-      const normalized = typeof msg === 'string' ? { text: msg } : msg
-      setMessages((prev) => [...prev, normalized]);
-    });
-
-    // Cleanup
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.off("message");
-      }
-    };
-  }, [sessionId]);
-
-  // Send message to server
+  // --- Send message to server ---
   function sendChat() {
     if (message.trim() === "" || !sessionId) return;
-    const outgoing = { sessionId, text: message, role: "user" }
-    if (socketRef.current) {
-      socketRef.current.emit("message", outgoing);
-    }
-    setMessages((prev) => [...prev, outgoing])
-    console.log( outgoing);
+
+    const outgoing = { sessionId, text: message, role: "user" };
+
+    // Send to backend
+    socketRef.current?.emit("message", outgoing);
+
+    // Append locally
+    setMessages((prev) => [...prev, outgoing]);
+
     setMessage("");
   }
 
   return (
     <div className="chat-interface">
-      <h2>Chat Interface {sessionId ? `(Session: ${sessionId})` : '(pick a session from sidebar)'} </h2>
+      <h2>
+        Chat Interface{" "}
+        {sessionId
+          ? `(Session: ${sessionId})`
+          : "(pick a session from sidebar)"}
+      </h2>
+
       <div className="messages">
         {messages.map((msg, i) => (
-          <p key={i}>{msg.text || msg}</p>
+          <p key={i} className={msg.role}>
+            <strong>{msg.role}:</strong> {msg.text}
+          </p>
         ))}
       </div>
-      <input
-        type="text"
-        placeholder="Type a message..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-      />
-      <button onClick={sendChat}>Send</button>
+
+      <div className="input-box">
+        <input
+          type="text"
+          placeholder="Type a message..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendChat()}
+        />
+        <button onClick={sendChat}>Send</button>
+      </div>
     </div>
   );
 }

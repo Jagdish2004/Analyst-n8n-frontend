@@ -23,7 +23,7 @@ export function SideBar({ onSelectSession }) {
         {displayHistory.length > 0 ? (
           displayHistory.map((item, index) => (
             <li key={index} style={{cursor:"pointer"}} onClick={() => onSelectSession && onSelectSession(item.session_id)}>
-              Session: {item.session_id}
+             {item.title}
             </li>
           ))
         ) : (
