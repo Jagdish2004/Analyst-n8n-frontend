@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export function ChatInterface({ sessionId: propSessionId, sessionTitle: propSessionTitle, onSessionCreated }) {
   const [sessionId, setSessionId] = useState(null);

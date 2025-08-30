@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+const API_BASE = import.meta.env.VITE_API_URL;
+
+
 
 export function SideBar({ onSelectSession, selectedSessionId }) {
   const [displayHistory, setDisplayHistory] = useState([]);
@@ -11,7 +14,7 @@ export function SideBar({ onSelectSession, selectedSessionId }) {
       setError(null);
       try {
         console.log("🔄 Fetching history from backend...");
-        const response = await fetch("http://localhost:3000/history");
+        const response = await fetch(`${API_BASE}/history`);
         console.log("📡 Response status:", response.status);
         
         if (!response.ok) {
